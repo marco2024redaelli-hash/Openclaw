@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw su Raspberry Pi 4 — Guida Setup</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --surface: #111827;
+      --surface2: #1a2236;
+      --border: #2a3550;
+      --accent: #22c55e;
+      --accent-dim: #166534;
+      --accent-glow: rgba(34, 197, 94, 0.15);
+      --warn: #f59e0b;
+      --warn-dim: #78350f;
+      --error: #ef4444;
+      --text: #e2e8f0;
+      --text-dim: #8892a8;
+      --text-bright: #ffffff;
+      --raspberry: #c51a4a;
+      --raspberry-glow: rgba(197, 26, 74, 0.2);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background grid effect */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(34, 197, 94, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 197, 94, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 40px 0 32px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+
+    .header-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .header h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-bright);
+      letter-spacing: -0.5px;
+    }
+
+    .header h1 span {
+      color: var(--accent);
+    }
+
+    .header p {
+      color: var(--text-dim);
+      margin-top: 8px;
+      font-size: 15px;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      position: sticky;
+      top: 8px;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .progress-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .progress-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .progress-track {
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #4ade80);
+      border-radius: 3px;
+      transition: width 0.5s ease;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    /* Steps */
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .step.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 24px var(--accent-glow), inset 0 1px 0 rgba(34, 197, 94, 0.1);
+    }
+
+    .step.completed {
+      border-color: var(--accent-dim);
+      opacity: 0.7;
+    }
+
+    .step.locked {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .step-header {
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .step-number {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+      background: var(--surface2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      transition: all 0.3s ease;
+    }
+
+    .step.active .step-number {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .step.completed .step-number {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
+
+    .step-title {
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--text-bright);
+      flex: 1;
+    }
+
+    .step.completed .step-title {
+      text-decoration: line-through;
+      color: var(--text-dim);
+    }
+
+    .step-status {
+      font-size: 18px;
+    }
+
+    .step-body {
+      padding: 0 20px 20px;
+      display: none;
+    }
+
+    .step.active .step-body {
+      display: block;
+    }
+
+    .step-desc {
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .step-desc strong {
+      color: var(--text);
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 12px 0;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .code-block .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all 0.2s;
+    }
+
+    .code-block .copy-btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    /* Warnings & Tips */
+    .callout {
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 12px 0;
+      font-size: 13px;
+      line-height: 1.6;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .callout-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .callout.tip {
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-dim);
+      color: #86efac;
+    }
+
+    .callout.warn {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid var(--warn-dim);
+      color: #fcd34d;
+    }
+
+    .callout.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .callout.info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid #1e3a5f;
+      color: #93c5fd;
+    }
+
+    /* Checklist */
+    .checklist {
+      list-style: none;
+      margin: 12px 0;
+    }
+
+    .checklist li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .checklist li:hover {
+      border-color: var(--border);
+    }
+
+    .checklist li .check {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      font-size: 12px;
+      color: transparent;
+    }
+
+    .checklist li.checked .check {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg);
+    }
+
+    .checklist li.checked {
+      color: var(--text-dim);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn-primary:hover {
+      background: #4ade80;
+      box-shadow: 0 0 20px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border);
+    }
+
+    /* Hardware list */
+    .hw-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .hw-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .hw-item .hw-icon {
+      font-size: 22px;
+    }
+
+    .hw-item.ready {
+      border-color: var(--accent-dim);
+    }
+
+    .hw-item.ready::after {
+      content: '✓';
+      margin-left: auto;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .hw-item.needed {
+      border-color: var(--warn-dim);
+    }
+
+    .hw-item.needed::after {
+      content: '?';
+      margin-left: auto;
+      color: var(--warn);
+      font-weight: 700;
+    }
+
+    /* Diagram */
+    .diagram {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 16px 0;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 2;
+      color: var(--text-dim);
+    }
+
+    .diagram .node {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      color: var(--text-bright);
+      font-weight: 600;
+    }
+
+    .diagram .node.pi {
+      border-color: var(--raspberry);
+      box-shadow: 0 0 12px var(--raspberry-glow);
+    }
+
+    .diagram .arrow {
+      color: var(--accent);
+      margin: 0 8px;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 32px 0;
+      color: var(--text-dim);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 24px;
+    }
+
+    @media (max-width: 600px) {
+      .hw-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header h1 {
+        font-size: 22px;
+      }
+
+      .diagram {
+        font-size: 11px;
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <div class="header">
+      <span class="header-icon">🦞</span>
+      <h1>Open<span>Claw</span> su Raspberry Pi 4</h1>
+      <p>Guida interattiva — dal setup alla prima connessione Telegram</p>
+    </div>
+
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-info">
+        <span class="progress-label" id="progressLabel">STEP 1 / 10</span>
+        <span class="progress-count" id="progressPercent">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- STEP 1: Hardware Check -->
+    <div class="step active" data-step="1">
+      <div class="step-header" onclick="toggleStep(1)">
+        <div class="step-number">1</div>
+        <div class="step-title">Verifica Hardware</div>
+        <div class="step-status" id="status-1">📋</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">
+          Assicurati di avere tutto il necessario prima di iniziare.
+        </div>
+        <div class="hw-grid">
+          <div class="hw-item ready"><span class="hw-icon">🍓</span> Raspberry Pi 4 (4GB)</div>
+          <div class="hw-item ready"><span class="hw-icon">💾</span> microSD 16GB+</div>
+          <div class="hw-item ready"><span class="hw-icon">🔌</span> Alimentatore USB-C</div>
+          <div class="hw-item ready"><span class="hw-icon">🌐</span> Cavo Ethernet</div>
+          <div class="hw-item ready"><span class="hw-icon">📖</span> Lettore SD USB</div>
+          <div class="hw-item needed"><span class="hw-icon">🖥️</span> Cavo micro-HDMI</div>
+        </div>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠️</span>
+          <div>Il <strong>cavo micro-HDMI</strong> è necessario per il debug. Se il Pi non si avvia correttamente, senza
+            monitor non puoi vedere gli errori. Costo: ~7€ su Amazon.</div>
+        </div>
+
+        <ul class="checklist" id="hw-checklist">
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Ho il Raspberry Pi 4 con la microSD inserita</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Ho il caricatore USB-C (Moto G84 va bene)</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Ho il cavo Ethernet e il router è vicino</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Ho il lettore SD USB per il PC</li>
+        </ul>
+        <button class="btn btn-primary" onclick="completeStep(1)">Tutto pronto →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Flash SD -->
+    <div class="step locked" data-step="2">
+      <div class="step-header" onclick="toggleStep(2)">
+        <div class="step-number">2</div>
+        <div class="step-title">Flash Raspberry Pi OS Lite</div>
+        <div class="step-status" id="status-2">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">
+          Usa <strong>Raspberry Pi Imager</strong> sul tuo PC per flashare il sistema operativo sulla microSD.
+        </div>
+        <ul class="checklist" id="flash-checklist">
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Apri Raspberry Pi Imager sul PC</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Dispositivo → <strong>Raspberry Pi 4</strong>
+          </li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> OS → Raspberry Pi OS (other) → <strong>Raspberry
+              Pi OS Lite (64-bit)</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Archiviazione → la tua microSD</li>
+        </ul>
+        <div class="callout error">
+          <span class="callout-icon">🚨</span>
+          <div>Deve dire <strong>"Lite"</strong> nel riepilogo! Senza "Lite" è la versione con desktop, troppo pesante
+            per 16GB e OpenClaw.</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(2)">Fatto, microSD selezionata →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Personalizzazione -->
+    <div class="step locked" data-step="3">
+      <div class="step-header" onclick="toggleStep(3)">
+        <div class="step-number">3</div>
+        <div class="step-title">Personalizzazione Imager</div>
+        <div class="step-status" id="status-3">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">
+          Configura le impostazioni <strong>prima di scrivere</strong>. Clicca su "Personalizzazione" nel menu di
+          Imager.
+        </div>
+        <ul class="checklist" id="config-checklist">
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Hostname: <strong>openclaw</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> SSH: <strong>Abilitato</strong> con password</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Username: <strong>marco</strong> (o a scelta)
+          </li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Password: scelta e memorizzata</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Timezone: <strong>Europe/Rome</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> WiFi: saltato (usiamo Ethernet)</li>
+        </ul>
+        <div class="callout tip">
+          <span class="callout-icon">💡</span>
+          <div>Ricordati username e password — ti serviranno per collegarti via SSH!</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(3)">Configurato, ora SCRIVI →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Scrittura SD -->
+    <div class="step locked" data-step="4">
+      <div class="step-header" onclick="toggleStep(4)">
+        <div class="step-number">4</div>
+        <div class="step-title">Scrittura e Verifica</div>
+        <div class="step-status" id="status-4">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">
+          Clicca <strong>SCRIVI</strong> in Imager e aspetta. Il processo include scrittura + verifica e dura qualche
+          minuto.
+        </div>
+        <div class="callout info">
+          <span class="callout-icon">⏳</span>
+          <div>Non rimuovere la microSD durante la scrittura. Aspetta il messaggio "Scrittura completata con successo".
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(4)">Scrittura completata →</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: Collegamento fisico -->
+    <div class="step locked" data-step="5">
+      <div class="step-header" onclick="toggleStep(5)">
+        <div class="step-number">5</div>
+        <div class="step-title">Collegamento del Pi</div>
+        <div class="step-status" id="status-5">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">
+          Collega tutto al Raspberry Pi nell'ordine corretto.
+        </div>
+
+        <div class="diagram">
+          <span class="node">💻 PC HP</span>
+          <span class="arrow">── WiFi ──→</span>
+          <span class="node">📡 Router Fastweb</span>
+          <span class="arrow">←── Ethernet ──</span>
+          <span class="node pi">🍓 Raspberry Pi</span>
+          <br><br>
+          <span class="node pi">🍓 Pi</span>
+          <span class="arrow">←── USB-C ──</span>
+          <span class="node">🔌 Alimentatore (presa muro)</span>
+        </div>
+
+        <ul class="checklist">
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> 1. Inserisci la microSD nel Pi (slot sotto la
+            scheda)</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> 2. Collega il cavo Ethernet: Pi ↔ Router</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> 3. Collega alimentatore USB-C alla PRESA A MURO
+            (non al PC!)</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> 4. Collega il cavo USB-C al Pi</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> 5. LED rosso fisso + LED verde lampeggia = OK
+          </li>
+        </ul>
+
+        <div class="callout error">
+          <span class="callout-icon">🚨</span>
+          <div>L'alimentazione va alla <strong>presa elettrica</strong>, NON alla porta USB del PC! Il PC non dà
+            abbastanza corrente.</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(5)">Pi acceso e collegato →</button>
+      </div>
+    </div>
+
+    <!-- STEP 6: SSH -->
+    <div class="step locked" data-step="6">
+      <div class="step-header" onclick="toggleStep(6)">
+        <div class="step-number">6</div>
+        <div class="step-title">Connessione SSH</div>
+        <div class="step-status" id="status-6">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">
+          Aspetta <strong>2 minuti</strong> per il primo avvio, poi collegati dal PC. Apri <strong>PowerShell</strong>
+          (cerca nel menu Start).
+        </div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>ssh marco@openclaw.local</code>
+        </div>
+
+        <div class="step-desc">Se non funziona, prova con l'IP diretto. Cercalo sul router (192.168.1.254) o scansiona
+          la rete:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>ssh marco@192.168.1.XXX</code>
+        </div>
+
+        <div class="step-desc">Per trovare l'IP, scansiona la rete:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>1..254 | % { $ip="192.168.1.$_"; if(Test-Connection $ip -Count 1 -Quiet -TimeoutSeconds 1){ Write-Host "$ip risponde" } }</code>
+        </div>
+
+        <div class="callout tip">
+          <span class="callout-icon">💡</span>
+          <div>La prima volta ti chiede conferma — scrivi <strong>yes</strong>. Poi inserisci la password che hai scelto
+            nello Step 3.</div>
+        </div>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠️</span>
+          <div>Se hai timeout, collega un monitor micro-HDMI al Pi per vedere se il sistema si è avviato. Il LED verde
+            che fa <strong>4 lampeggi ripetuti</strong> = la microSD non viene letta.</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(6)">Connesso via SSH! →</button>
+      </div>
+    </div>
+
+    <!-- STEP 7: System Update + Swap -->
+    <div class="step locked" data-step="7">
+      <div class="step-header" onclick="toggleStep(7)">
+        <div class="step-number">7</div>
+        <div class="step-title">Aggiornamento e Swap</div>
+        <div class="step-status" id="status-7">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">Una volta dentro via SSH, aggiorna il sistema e crea lo swap (fondamentale con 4GB di
+          RAM).</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>sudo apt update && sudo apt upgrade -y</code>
+        </div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>sudo apt install -y git curl build-essential</code>
+        </div>
+
+        <div class="step-desc">Crea 2GB di swap:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab</code>
+        </div>
+
+        <div class="step-desc">Ottimizza per headless:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>echo 'gpu_mem=16' | sudo tee -a /boot/config.txt
+sudo systemctl disable bluetooth
+sudo timedatectl set-timezone Europe/Rome</code>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(7)">Sistema aggiornato →</button>
+      </div>
+    </div>
+
+    <!-- STEP 8: Node.js -->
+    <div class="step locked" data-step="8">
+      <div class="step-header" onclick="toggleStep(8)">
+        <div class="step-number">8</div>
+        <div class="step-title">Installa Node.js 24</div>
+        <div class="step-status" id="status-8">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">OpenClaw richiede Node.js 24. Installalo:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt install -y nodejs</code>
+        </div>
+
+        <div class="step-desc">Verifica:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>node --version
+npm --version</code>
+        </div>
+
+        <div class="callout tip">
+          <span class="callout-icon">💡</span>
+          <div>Deve mostrare <strong>v24.x.x</strong> per node. Se non è v24, ripeti il curl.</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(8)">Node.js installato →</button>
+      </div>
+    </div>
+
+    <!-- STEP 9: OpenClaw -->
+    <div class="step locked" data-step="9">
+      <div class="step-header" onclick="toggleStep(9)">
+        <div class="step-number">9</div>
+        <div class="step-title">Installa OpenClaw</div>
+        <div class="step-status" id="status-9">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">Installa OpenClaw con lo script ufficiale:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>curl -fsSL https://openclaw.ai/install.sh | bash</code>
+        </div>
+
+        <div class="step-desc">Poi avvia l'onboarding:</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>openclaw onboard --install-daemon</code>
+        </div>
+
+        <div class="step-desc">Durante l'onboarding:</div>
+
+        <ul class="checklist">
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Homebrew → <strong>No</strong> (è per Mac)</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Package manager → <strong>npm</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Skills → <strong>Skip for now</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> API keys → <strong>No</strong> (configuri dopo)
+          </li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Modello →
+            <strong>anthropic/claude-sonnet-4-20250514</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Canali → <strong>Skip for now</strong> (Telegram
+            dopo)</li>
+        </ul>
+
+        <div class="callout info">
+          <span class="callout-icon">🔑</span>
+          <div>Ti chiederà l'<strong>API key Anthropic</strong>. La trovi su <strong>console.anthropic.com</strong> →
+            API Keys.</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(9)">OpenClaw installato →</button>
+      </div>
+    </div>
+
+    <!-- STEP 10: Telegram -->
+    <div class="step locked" data-step="10">
+      <div class="step-header" onclick="toggleStep(10)">
+        <div class="step-number">10</div>
+        <div class="step-title">Connetti Telegram</div>
+        <div class="step-status" id="status-10">🔒</div>
+      </div>
+      <div class="step-body">
+        <div class="step-desc">Aggiungi Telegram come canale per controllare OpenClaw dal telefono.</div>
+
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Copia</button>
+          <code>openclaw channels add telegram</code>
+        </div>
+
+        <div class="step-desc">Poi su Telegram:</div>
+
+        <ul class="checklist">
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Cerca <strong>@BotFather</strong> su Telegram
+          </li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Invia <strong>/newbot</strong></li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Scegli un nome per il bot</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Copia il <strong>token API</strong> fornito da
+            BotFather</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Incolla il token nel terminale SSH</li>
+          <li onclick="toggleCheck(this)"><span class="check">✓</span> Cerca il tuo bot su Telegram e invia
+            <strong>/start</strong></li>
+        </ul>
+
+        <div class="callout tip">
+          <span class="callout-icon">🎉</span>
+          <div>Fatto! Ora puoi parlare con OpenClaw direttamente da Telegram sul tuo Moto G84. Il Pi resta acceso 24/7 e
+            OpenClaw è sempre disponibile!</div>
+        </div>
+        <button class="btn btn-primary" onclick="completeStep(10)">🦞 OpenClaw è LIVE!</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      🍓 Raspberry Pi 4 (4GB) + 🦞 OpenClaw + 🤖 Claude API<br>
+      Guida creata per Marco — Deca Srl / MarkitacoDesign
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 10;
+
+    function updateProgress() {
+      const completed = currentStep - 1;
+      const percent = Math.round((completed / totalSteps) * 100);
+      document.getElementById('progressLabel').textContent = `STEP ${currentStep} / ${totalSteps}`;
+      document.getElementById('progressPercent').textContent = `${percent}%`;
+      document.getElementById('progressFill').style.width = `${percent}%`;
+    }
+
+    function completeStep(n) {
+      const step = document.querySelector(`[data-step="${n}"]`);
+      step.classList.remove('active');
+      step.classList.add('completed');
+      document.getElementById(`status-${n}`).textContent = '✅';
+
+      if (n < totalSteps) {
+        currentStep = n + 1;
+        const next = document.querySelector(`[data-step="${currentStep}"]`);
+        next.classList.remove('locked');
+        next.classList.add('active');
+        document.getElementById(`status-${currentStep}`).textContent = '📋';
+        next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        currentStep = totalSteps + 1;
+        document.getElementById('progressLabel').textContent = '🦞 COMPLETATO!';
+        document.getElementById('progressPercent').textContent = '100%';
+        document.getElementById('progressFill').style.width = '100%';
+      }
+      updateProgress();
+    }
+
+    function toggleStep(n) {
+      const step = document.querySelector(`[data-step="${n}"]`);
+      if (step.classList.contains('locked')) return;
+      if (step.classList.contains('completed')) {
+        step.classList.toggle('active');
+      }
+    }
+
+    function toggleCheck(el) {
+      el.classList.toggle('checked');
+    }
+
+    function copyCode(btn) {
+      const code = btn.parentElement.querySelector('code').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = 'Copiato!';
+        setTimeout(() => btn.textContent = 'Copia', 1500);
+      });
+    }
+
+    updateProgress();
+  </script>
+</body>
+
+</html>
